@@ -146,7 +146,7 @@ const AirQualityWidget = () => {
 
             {/* Main Metric */}
             <div className="flex items-end gap-2 mt-4 z-10">
-                <span className="text-4xl font-bold text-slate-800">{data.aqi * 20 + Math.floor(Math.random() * 10)}</span>
+                <span className="text-4xl font-bold text-slate-800">{data.aqi * 20}</span>
                 <span className="text-xs text-slate-400 mb-1 font-medium">AQI Index</span>
             </div>
 

@@ -20,6 +20,7 @@ import ExpertResearch from './pages/ExpertResearch';
 import TreeManager from './pages/TreeManager';
 import ConsultationHistory from './pages/ConsultationHistory';
 import KnowledgeManager from './pages/KnowledgeManager';
+import FuzzyAssessment from './pages/FuzzyAssessment';
 
 // Helper Component for Role-Based Dashboard
 const RoleBasedDashboard = () => {
@@ -58,6 +59,14 @@ const App = () => {
           <ProtectedRoute allowedRoles={['patient']}>
             <AppShell>
               <Riwayat />
+            </AppShell>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/fuzzy-assessment" element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <AppShell>
+              <FuzzyAssessment />
             </AppShell>
           </ProtectedRoute>
         } />

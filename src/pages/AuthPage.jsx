@@ -49,13 +49,6 @@ const AuthPage = () => {
                 }
             } else {
                 // REGISTER FLOW
-                // Validate Expert Code
-                if (formData.isExpert && formData.licenseCode !== 'DOKTER123') {
-                    setError('Kode Lisensi Pakar tidak valid.');
-                    setLoading(false);
-                    return;
-                }
-
                 const newUser = {
                     name: formData.name,
                     email: formData.email,

@@ -1,34 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Eye, Calendar, User } from 'lucide-react';
+import { api } from '../services/api';
+import clsx from 'clsx';
 
 const ConsultationHistory = () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const res = await fetch(`${API_URL}/admin/history/all`);
-                const data = await res.json();
-                if (data.success) {
-                    setHistory(data.data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch history", err);
-                // Mock Data
-                setHistory([
-                    { id: 1, date: '2023-12-02', patient: 'Budi Santoso', diagnosis: 'Asma Bronkial', score: 85, status: 'Selesai' },
-                    { id: 2, date: '2023-12-02', patient: 'Siti Aminah', diagnosis: 'ISPA Ringan', score: 45, status: 'Selesai' },
-                    { id: 3, date: '2023-12-01', patient: 'Ahmad Rizki', diagnosis: 'Suspek TBC', score: 92, status: 'Rujuk RS' },
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHistory();
+        try {
+            const allLogs = api.getAllDiagnosisLogs();
+            const allUsers = api.getAllUsers();
+            // Gabungkan log dengan nama user
+            const mapped = allLogs
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .map((log) => {
+                    const u = allUsers.find((u) => u.id === log.userId);
+                    return {
+                        id: log.id,
+                        date: log.createdAt ? log.createdAt.split('T')[0] : '-',
+                        patient: u ? u.name : 'Pengguna',
+                        diagnosis: log.finalResult || '-',
+                        score: log.confidenceScore || 0,
+                        status: log.riskLevel ? `Risiko ${log.riskLevel}` : 'Selesai',
+                    };
+                });
+            setHistory(mapped);
+        } catch (err) {
+            console.error('Failed to load history', err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     const filteredHistory = history.filter(item =>
@@ -121,9 +124,5 @@ const ConsultationHistory = () => {
     );
 };
 
-// Helper for clsx if not imported
-function clsx(...classes) {
-    return classes.filter(Boolean).join(' ');
-}
 
 export default ConsultationHistory;

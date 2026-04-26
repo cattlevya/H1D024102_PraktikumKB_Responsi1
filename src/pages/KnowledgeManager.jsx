@@ -3,51 +3,49 @@ import { Database, Plus, Trash2, Edit2, Save, GitMerge, Brain, FileText, Check, 
 import clsx from 'clsx';
 import LogicManager from '../components/expert/LogicManager';
 import { decisionTree } from '../data/decisionTree';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const KnowledgeManager = () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const [activeTab, setActiveTab] = useState('logic'); // logic, research
+    const [activeTab, setActiveTab] = useState('logic');
     const [loading, setLoading] = useState(false);
     const [drafts, setDrafts] = useState([]);
     const [error, setError] = useState(null);
 
-    // --- RESEARCH HANDLERS ---
     const handleAutoResearch = async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`${API_URL}/expert/research`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'auto' }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setDrafts(prev => [...data.data, ...prev]);
-            } else {
-                setError(data.message || 'Gagal melakukan riset.');
-            }
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            if (!apiKey) throw new Error('VITE_GEMINI_API_KEY tidak dikonfigurasi.');
+
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+            const prompt = `Kamu adalah asisten riset medis. Berikan 3 temuan terbaru (2024-2025) tentang penyakit pernapasan (ISPA, Asma, PPOK, TBC, Pneumonia) dalam format JSON array. Setiap item harus memiliki field: name (string), type ("symptom" atau "rule"), clinical_evidence (string, maks 100 kata), suggested_action (string), source_journal (string). Balas HANYA dengan JSON array, tanpa teks lain.`;
+
+            const result = await model.generateContent(prompt);
+            const text = result.response.text().trim();
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error('Format respons AI tidak valid.');
+
+            const data = JSON.parse(jsonMatch[0]);
+            setDrafts(prev => [...data, ...prev]);
         } catch (err) {
             console.error(err);
-            setError('Terjadi kesalahan koneksi.');
+            setError('Gagal melakukan riset: ' + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleApprove = async (draft, index) => {
+    const handleApprove = (draft, index) => {
         try {
-            const res = await fetch(`${API_URL}/expert/merge`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ draft }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                alert('Data berhasil ditambahkan ke sistem!');
-                setDrafts(prev => prev.filter((_, i) => i !== index));
-            }
-        } catch (err) {
+            const existing = JSON.parse(localStorage.getItem('respira_knowledge_base') || '[]');
+            existing.push({ ...draft, approvedAt: new Date().toISOString() });
+            localStorage.setItem('respira_knowledge_base', JSON.stringify(existing));
+            alert('Data berhasil ditambahkan ke basis pengetahuan lokal!');
+            setDrafts(prev => prev.filter((_, i) => i !== index));
+        } catch {
             alert('Gagal menyimpan data.');
         }
     };

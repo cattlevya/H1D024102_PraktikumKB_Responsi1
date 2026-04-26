@@ -22,9 +22,9 @@ const Sidebar = () => {
         { label: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['patient', 'expert'] },
         { label: 'Diagnosa', path: '/diagnosa', icon: Stethoscope, roles: ['patient'] },
         { label: 'Riwayat', path: '/riwayat', icon: History, roles: ['patient', 'expert'] },
+        { label: 'Risiko Pernapasan', path: '/fuzzy-assessment', icon: Brain, roles: ['patient'] },
         { label: 'Berita Medis', path: '/news', icon: Newspaper, roles: ['patient', 'expert'] },
         { label: 'Profil Saya', path: '/profile', icon: User, roles: ['patient'] },
-        // { label: 'Riset AI', path: '/expert/research', icon: Brain, roles: ['expert'] }, // Expert has own sidebar now
     ];
 
     const handleLogout = () => {

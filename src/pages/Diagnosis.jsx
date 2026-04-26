@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { decisionTree } from '../data/decisionTree';
 import { ImageGrid, AudioPlayer } from '../components/ui/MultimediaCards';
-import { AlertTriangle, CheckCircle, ArrowRight, RefreshCw, ChevronLeft, Save, Loader2, Stethoscope } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ArrowRight, RefreshCw, ChevronLeft, Save, Loader2, Stethoscope, Wind, Activity, Droplets } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import DiagnosisHeaderCard from '../components/diagnosis/result/DiagnosisHeaderCard';
 import ClinicalAnalysis from '../components/diagnosis/result/ClinicalAnalysis';
 import ActionPlanSidebar from '../components/diagnosis/result/ActionPlanSidebar';
+import { fuzzyEngine } from '../services/fuzzyEngine';
+import { mapAnswersToFuzzyInputs } from '../services/fuzzyMapper';
 
 // Placeholder for the requested asset since file generation is quota-limited
 // In a real scenario, we would import the file: import neuralLungImage from '../assets/images/neural-lungs-diagnostic.png';
@@ -26,6 +28,10 @@ const Diagnosis = () => {
     const [saveStatus, setSaveStatus] = useState('idle'); // idle, saved, error
     const hasSavedRef = useRef(false); // Ref to prevent double save in StrictMode
 
+    // Fuzzy result — dihitung otomatis dari jawaban diagnosis
+    const [fuzzyResult, setFuzzyResult] = useState(null);
+    const [fuzzyInputs, setFuzzyInputs] = useState(null);
+
     const currentNode = decisionTree.find(n => n.id === currentNodeId);
 
     // Scroll to top on node change
@@ -38,15 +44,27 @@ const Diagnosis = () => {
     useEffect(() => {
         const saveResult = async () => {
             if (currentNode?.type === 'result' && user?.id && !hasSavedRef.current) {
-                hasSavedRef.current = true; // Mark as saved immediately
+                hasSavedRef.current = true;
                 setIsSaving(true);
 
-                // Prepare data
+                // Hitung fuzzy dari jawaban diagnosis secara otomatis
+                const mapped = mapAnswersToFuzzyInputs(answers, currentNode);
+                setFuzzyInputs(mapped);
+                const fResult = fuzzyEngine.assess(mapped);
+                if (fResult.success) setFuzzyResult(fResult);
+
                 const diagnosisData = {
                     userId: user.id,
+                    finalResult: currentNode.diagnosis,
+                    confidenceScore: currentNode.confidence || (currentNode.severity === 'critical' ? 90 : 75),
+                    symptomsSummary: answers,
+                    severity: currentNode.severity || 'moderate',
+                    riskScore: fResult.success ? fResult.riskScore : null,
+                    riskLevel: fResult.success ? fResult.riskLevel : null,
+                    // Alias lama untuk kompatibilitas
                     result: currentNode.diagnosis,
-                    score: currentNode.confidence || (currentNode.severity === 'critical' ? 90 : 75),
-                    symptoms: answers // Save the path taken
+                    score: currentNode.confidence || 75,
+                    symptoms: answers,
                 };
 
                 const res = await api.saveDiagnosis(diagnosisData);
@@ -54,7 +72,7 @@ const Diagnosis = () => {
                     setSaveStatus('saved');
                 } else {
                     setSaveStatus('error');
-                    hasSavedRef.current = false; // Allow retry if failed
+                    hasSavedRef.current = false;
                 }
                 setIsSaving(false);
             }
@@ -99,6 +117,8 @@ const Diagnosis = () => {
         setSelectedOption(null);
         hasSavedRef.current = false;
         setSaveStatus('idle');
+        setFuzzyResult(null);
+        setFuzzyInputs(null);
     };
 
     if (!currentNode) {
@@ -284,7 +304,88 @@ const Diagnosis = () => {
                 {/* Sidebar Column (4/12) */}
                 <div className="lg:col-span-4 space-y-6">
                     {isResult ? (
-                        <ActionPlanSidebar severity={currentNode.severity} />
+                        <>
+                            <ActionPlanSidebar severity={currentNode.severity} />
+
+                            {/* ── Panel Fuzzy Risk Assessment ── */}
+                            {fuzzyResult && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6"
+                                >
+                                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Wind className="w-5 h-5 text-teal-600" />
+                                        Penilaian Risiko Pernapasan
+                                    </h3>
+
+                                    {/* Risk Score Bar */}
+                                    <div className="mb-4">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-sm text-slate-500">Skor Risiko</span>
+                                            <span className="text-2xl font-black text-slate-800">{fuzzyResult.riskScore}</span>
+                                        </div>
+                                        <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className={clsx(
+                                                    'h-full rounded-full',
+                                                    fuzzyEngine.getRiskColor(fuzzyResult.riskLevel).bar
+                                                )}
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${fuzzyResult.riskScore}%` }}
+                                                transition={{ duration: 0.8, delay: 0.3 }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Risk Level Badge */}
+                                    <div className={clsx(
+                                        'px-4 py-2 rounded-xl text-center font-bold text-sm mb-4',
+                                        fuzzyEngine.getRiskColor(fuzzyResult.riskLevel).bg,
+                                        fuzzyEngine.getRiskColor(fuzzyResult.riskLevel).text
+                                    )}>
+                                        {fuzzyResult.riskLevel}
+                                    </div>
+
+                                    {/* Deskripsi */}
+                                    <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                                        {fuzzyEngine.getRiskDescription(fuzzyResult.riskLevel)}
+                                    </p>
+
+                                    {/* Input yang digunakan */}
+                                    {fuzzyInputs && (
+                                        <div className="space-y-2 border-t border-slate-100 pt-4">
+                                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                                                Berdasarkan jawaban Anda
+                                            </p>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="flex items-center gap-1 text-slate-500">
+                                                    <Wind className="w-3 h-3" /> Batuk
+                                                </span>
+                                                <span className="font-semibold text-slate-700">{fuzzyInputs.coughFrequency} kali/hari</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="flex items-center gap-1 text-slate-500">
+                                                    <Activity className="w-3 h-3" /> Sesak
+                                                </span>
+                                                <span className="font-semibold text-slate-700">{fuzzyInputs.breathlessnessLevel}/10</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="flex items-center gap-1 text-slate-500">
+                                                    <Droplets className="w-3 h-3" /> SpO2
+                                                </span>
+                                                <span className="font-semibold text-slate-700">{fuzzyInputs.spo2Level}%</span>
+                                            </div>
+                                            {fuzzyInputs.confidence < 1 && (
+                                                <p className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2 mt-2">
+                                                    Sebagian nilai diestimasi dari tingkat keparahan diagnosis.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </>
                     ) : (
                         <>
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">

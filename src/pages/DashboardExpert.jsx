@@ -16,12 +16,11 @@ import {
 import { Card, Badge, Button } from '../components/ui/Widgets';
 import BioNetwork from '../components/visuals/BioNetwork';
 import { useAuth } from '../context/AuthContext';
-import { decisionTree } from '../data/decisionTree';
+import { api } from '../services/api';
 import clsx from 'clsx';
 
 const DashboardExpert = () => {
     const { user } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
@@ -33,11 +32,7 @@ const DashboardExpert = () => {
 
     // Helper to determine severity from diagnosis string
     const getSeverity = (diagnosisResult) => {
-        // 1. Try to find exact match in decision tree
-        const node = decisionTree.find(n => n.diagnosis === diagnosisResult);
-        if (node && node.severity) return node.severity;
-
-        // 2. Fallback: Keyword matching
+        if (!diagnosisResult) return 'low';
         const lower = diagnosisResult.toLowerCase();
         if (lower.includes('gawat') || lower.includes('darurat') || lower.includes('bahaya') || lower.includes('kritis') || lower.includes('segera')) return 'critical';
         if (lower.includes('perlu') || lower.includes('waspada') || lower.includes('sedang')) return 'moderate';
@@ -47,15 +42,8 @@ const DashboardExpert = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await fetch(`${API_URL}/admin/stats`);
-                const result = await response.json();
-                if (result.success) {
-                    setStats(prev => ({
-                        ...prev,
-                        ...result.data,
-                        recent_activity: result.data.recent_activity || []
-                    }));
-                }
+                const result = api.getAdminStats();
+                setStats(result);
             } catch (error) {
                 console.error("Failed to fetch admin stats", error);
             } finally {

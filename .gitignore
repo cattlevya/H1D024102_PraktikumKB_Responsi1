@@ -32,3 +32,6 @@ dist-ssr
 build_*.txt
 dev_error.txt
 debug_log*.txt
+
+# Local Netlify folder
+.netlify

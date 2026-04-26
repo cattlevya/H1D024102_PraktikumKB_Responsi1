@@ -8,7 +8,8 @@ import ReactFlow, {
     MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { RefreshCw, ZoomIn, ZoomOut, Maximize, Lock } from 'lucide-react';
+import { RefreshCw, Lock } from 'lucide-react';
+import { decisionTree } from '../data/decisionTree';
 
 // Custom Node Styles (Inline for simplicity, or could be separate components)
 const nodeStyles = {
@@ -51,36 +52,77 @@ const TreeVisualizer = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [loading, setLoading] = useState(true);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const buildGraphFromTree = (tree) => {
+        const nodeMap = new Map(tree.map(n => [n.id, n]));
+        const positions = {};
+        const levelMap = {};
+        const queue = [{ id: 'start', level: 0, col: 0 }];
+        const visited = new Set();
+        const levelCols = {};
 
-    const fetchTree = async () => {
+        while (queue.length > 0) {
+            const { id, level } = queue.shift();
+            if (visited.has(id)) continue;
+            visited.add(id);
+
+            if (!levelCols[level]) levelCols[level] = 0;
+            positions[id] = { x: levelCols[level] * 220, y: level * 140 };
+            levelCols[level]++;
+            levelMap[id] = level;
+
+            const node = nodeMap.get(id);
+            if (node?.options) {
+                node.options.forEach(opt => {
+                    if (opt.next && !visited.has(opt.next)) {
+                        queue.push({ id: opt.next, level: level + 1 });
+                    }
+                });
+            }
+        }
+
+        const flowNodes = tree
+            .filter(n => positions[n.id])
+            .map(n => ({
+                id: n.id,
+                position: positions[n.id],
+                data: { label: n.question || n.diagnosis || n.id },
+                type: n.type === 'result' ? 'output' : n.id === 'start' ? 'input' : 'default',
+                style: nodeStyles[n.type === 'result' ? 'output' : n.id === 'start' ? 'input' : 'default'],
+                draggable: false,
+                connectable: false,
+            }));
+
+        const flowEdges = [];
+        tree.forEach(n => {
+            if (n.options) {
+                n.options.forEach((opt, idx) => {
+                    if (opt.next && positions[opt.next]) {
+                        flowEdges.push({
+                            id: `${n.id}-${opt.next}-${idx}`,
+                            source: n.id,
+                            target: opt.next,
+                            label: opt.label?.substring(0, 20),
+                            type: 'smoothstep',
+                            markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
+                            style: { stroke: '#94a3b8', strokeWidth: 2 },
+                            labelStyle: { fill: '#64748b', fontWeight: 500, fontSize: 10 },
+                        });
+                    }
+                });
+            }
+        });
+
+        return { flowNodes, flowEdges };
+    };
+
+    const fetchTree = () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/tree`);
-            const data = await res.json();
-            if (data.success) {
-                // Apply visual styles to nodes
-                const styledNodes = data.data.nodes.map(node => ({
-                    ...node,
-                    style: nodeStyles[node.type] || nodeStyles.default,
-                    draggable: false,
-                    connectable: false,
-                }));
-
-                // Apply styles to edges
-                const styledEdges = data.data.edges.map(edge => ({
-                    ...edge,
-                    type: 'smoothstep', // Professional right-angle curves
-                    markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
-                    style: { stroke: '#94a3b8', strokeWidth: 2 },
-                    labelStyle: { fill: '#64748b', fontWeight: 500 },
-                }));
-
-                setNodes(styledNodes);
-                setEdges(styledEdges);
-            }
+            const { flowNodes, flowEdges } = buildGraphFromTree(decisionTree);
+            setNodes(flowNodes);
+            setEdges(flowEdges);
         } catch (err) {
-            console.error("Failed to fetch tree", err);
+            console.error('Failed to build tree', err);
         } finally {
             setLoading(false);
         }

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Save, User, Building, FileBadge, GraduationCap, Loader2, CheckCircle } from 'lucide-react';
+import { api } from '../services/api';
 
 const ProfileExpert = () => {
     const { user } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -25,22 +25,14 @@ const ProfileExpert = () => {
     const fetchProfile = async () => {
         setIsLoading(true);
         try {
-            // Reusing the user profile endpoint which returns all fields including new ones if they exist
-            // Wait, the backend endpoint /api/user/profile/:id selects specific fields. 
-            // I need to update the backend GET endpoint to include expert fields or use a new one.
-            // I'll assume I updated the GET endpoint or will update it. 
-            // Actually, I should update the GET endpoint in server/index.js to include these fields.
-            // For now, let's try fetching.
-            // For now, let's try fetching.
-            const res = await fetch(`${API_URL}/user/profile/${user.id}`);
-            const data = await res.json();
-            if (data.success) {
+            const result = await api.getProfile(user.id);
+            if (result.success) {
                 setFormData({
-                    name: data.data.name || '',
-                    email: data.data.email || '',
-                    institution: data.data.institution || '',
-                    title_degree: data.data.title_degree || '',
-                    sip_number: data.data.sip_number || ''
+                    name: result.data.name || '',
+                    email: result.data.email || '',
+                    institution: result.data.institution || '',
+                    title_degree: result.data.title_degree || '',
+                    sip_number: result.data.sip_number || ''
                 });
             }
         } catch (err) {
@@ -60,23 +52,18 @@ const ProfileExpert = () => {
         setMessage(null);
 
         try {
-            const res = await fetch(`${API_URL}/expert/profile/${user.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    institution: formData.institution,
-                    title_degree: formData.title_degree,
-                    sip_number: formData.sip_number
-                })
+            const result = await api.updateProfile(user.id, {
+                institution: formData.institution,
+                title_degree: formData.title_degree,
+                sip_number: formData.sip_number
             });
-            const data = await res.json();
-            if (data.success) {
+            if (result.success) {
                 setMessage({ type: 'success', text: 'Profil pakar berhasil diperbarui.' });
             } else {
                 setMessage({ type: 'error', text: 'Gagal menyimpan perubahan.' });
             }
         } catch (err) {
-            setMessage({ type: 'error', text: 'Terjadi kesalahan server.' });
+            setMessage({ type: 'error', text: 'Terjadi kesalahan.' });
         } finally {
             setIsSaving(false);
         }

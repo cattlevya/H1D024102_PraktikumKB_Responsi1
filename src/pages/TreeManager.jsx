@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Search, Save, X, Plus, Trash2, GitBranch } from 'lucide-react';
 import { Card, Button, Badge } from '../components/ui/Widgets';
+import { decisionTree } from '../data/decisionTree';
 
 const TreeManager = () => {
     const [nodes, setNodes] = useState([]);
@@ -8,28 +9,19 @@ const TreeManager = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [editingNode, setEditingNode] = useState(null);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-    // Mock Fetch (Replace with API)
     useEffect(() => {
-        const fetchTree = async () => {
-            try {
-                const res = await fetch(`${API_URL}/tree`);
-                const data = await res.json();
-                if (data.success) {
-                    setNodes(data.data.nodes);
-                }
-            } catch (err) {
-                console.error("Failed to fetch tree", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTree();
+        // Gunakan decisionTree lokal — tidak perlu backend
+        try {
+            setNodes(decisionTree || []);
+        } catch (err) {
+            console.error("Failed to load tree", err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     const filteredNodes = nodes.filter(node =>
-        node.data.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (node.question || node.diagnosis || node.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         node.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -38,10 +30,6 @@ const TreeManager = () => {
     };
 
     const handleSave = () => {
-        // Logic to save changes (API call)
-        alert(`Menyimpan perubahan pada Node ${editingNode.id}: ${editingNode.data.label}`);
-
-        // Update local state
         setNodes(prev => prev.map(n => n.id === editingNode.id ? editingNode : n));
         setEditingNode(null);
     };
@@ -90,12 +78,12 @@ const TreeManager = () => {
                             <tr key={node.id} className="hover:bg-slate-50 transition-colors group">
                                 <td className="p-4 font-mono text-xs text-slate-500">{node.id}</td>
                                 <td className="p-4">
-                                    <Badge variant={node.type === 'input' ? 'blue' : node.type === 'output' ? 'red' : 'gray'}>
-                                        {node.type === 'input' ? 'Start' : node.type === 'output' ? 'Diagnosa' : 'Pertanyaan'}
+                                    <Badge variant={node.type === 'danger_check' ? 'blue' : node.type === 'result' ? 'red' : 'gray'}>
+                                        {node.type === 'danger_check' ? 'Triase' : node.type === 'result' ? 'Diagnosa' : 'Pertanyaan'}
                                     </Badge>
                                 </td>
                                 <td className="p-4">
-                                    <p className="font-medium text-slate-800">{node.data.label}</p>
+                                    <p className="font-medium text-slate-800">{node.question || node.diagnosis || '-'}</p>
                                 </td>
                                 <td className="p-4 text-right">
                                     <button
@@ -121,7 +109,7 @@ const TreeManager = () => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-slate-900">Edit Node: {editingNode.id}</h3>
+                        <h3 className="font-bold text-lg text-slate-900">Edit Node: {editingNode.id}</h3>
                             <button onClick={() => setEditingNode(null)} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-5 h-5" />
                             </button>
@@ -132,8 +120,8 @@ const TreeManager = () => {
                                 <textarea
                                     className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     rows="3"
-                                    value={editingNode.data.label}
-                                    onChange={(e) => setEditingNode({ ...editingNode, data: { ...editingNode.data, label: e.target.value } })}
+                                    value={editingNode.question || editingNode.diagnosis || ''}
+                                    onChange={(e) => setEditingNode({ ...editingNode, question: e.target.value })}
                                 />
                             </div>
                             <div>

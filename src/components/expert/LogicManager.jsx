@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, ChevronDown, ChevronRight, Edit2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const LogicManager = ({ initialTree }) => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const [tree, setTree] = useState(initialTree || []);
     const [levels, setLevels] = useState({});
     const [expandedLevels, setExpandedLevels] = useState({ 0: true });
@@ -119,21 +118,13 @@ const LogicManager = ({ initialTree }) => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`${API_URL}/expert/save-tree`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ treeData: tree })
-            });
-            const data = await res.json();
-            if (data.success) {
-                alert("Berhasil disimpan!");
-                setIsDirty(false);
-            } else {
-                alert("Gagal menyimpan: " + data.message);
-            }
+            // Simpan ke localStorage
+            localStorage.setItem('respira_custom_tree', JSON.stringify(tree));
+            alert("Berhasil disimpan ke penyimpanan lokal!");
+            setIsDirty(false);
         } catch (err) {
             console.error(err);
-            alert("Error koneksi server.");
+            alert("Gagal menyimpan.");
         } finally {
             setSaving(false);
         }

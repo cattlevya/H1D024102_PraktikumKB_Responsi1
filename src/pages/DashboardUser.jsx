@@ -14,7 +14,6 @@ import clsx from 'clsx';
 
 const DashboardUser = () => {
     const { user } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const navigate = useNavigate();
 
     // State
@@ -33,15 +32,23 @@ const DashboardUser = () => {
         const fetchData = async () => {
             if (user?.id) {
                 try {
-                    const response = await fetch(`${API_URL}/dashboard/${user.id}`);
-                    const result = await response.json();
+                    const [profileRes, scoreRes, historyRes] = await Promise.all([
+                        api.getProfile(user.id),
+                        api.getScore(user.id),
+                        api.getHistory(user.id),
+                    ]);
 
-                    if (result.success) {
-                        setDashboardData(result.data);
-                        // Check if test needed
-                        if (result.data.latestScore === null) {
-                            setShowTestModal(true);
-                        }
+                    const latestScore = scoreRes.success ? scoreRes.score : null;
+
+                    setDashboardData({
+                        userName: user.name || '',
+                        userProfile: profileRes.success ? profileRes.data : {},
+                        latestScore,
+                        history: historyRes.success ? historyRes.data : [],
+                    });
+
+                    if (latestScore === null) {
+                        setShowTestModal(true);
                     }
                 } catch (error) {
                     console.error("Failed to fetch dashboard", error);
